@@ -47,3 +47,19 @@ export interface ProcessResult {
   outputPath: string;
   rowsWritten: number;
 }
+
+export interface SPMBatchSummary {
+  id: number;
+  noSPM: string;
+  keterangan: string;
+  kategori: Kategori;
+  rowCount: number;
+  createdAt: string;
+  storedFile: string | null;
+}
+
+export interface CreatePeriodeInput {
+  bulan: number;
+  tahun: number;
+  nomorUrut?: number;
+}

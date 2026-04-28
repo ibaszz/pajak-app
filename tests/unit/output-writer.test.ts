@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { writePajakOutput } from '../../src/main/excel/output-writer';
+import { writePajakOutput, writeEmptyPajakOutput } from '../../src/main/excel/output-writer';
 import type { Pegawai, SPMGajiRow, Periode } from '../../src/shared/types';
 
 function tmpFile(): string {
@@ -67,6 +67,29 @@ describe('writePajakOutput', () => {
 
     const namaCell = row2.getCell(namaCol);
     expect(namaCell.formula).toMatch(/VLOOKUP.*Ref Pegawai/i);
+  });
+
+  it('writeEmptyPajakOutput creates file with header-only Gaji Ledger', async () => {
+    const outPath = tmpFile();
+    const result = await writeEmptyPajakOutput({
+      outputPath: outPath,
+      pegawai: PEGAWAI,
+      periode: PERIODE
+    });
+
+    expect(result.rowsWritten).toBe(0);
+    expect(fs.existsSync(outPath)).toBe(true);
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(outPath);
+
+    const ref = wb.getWorksheet('Ref Pegawai');
+    expect(ref).toBeDefined();
+    expect(ref!.rowCount).toBe(3); // header + 2 pegawai
+
+    const ledger = wb.getWorksheet('Gaji Ledger');
+    expect(ledger).toBeDefined();
+    expect(ledger!.rowCount).toBe(1); // header only
   });
 
   it('overwrites existing output file', async () => {

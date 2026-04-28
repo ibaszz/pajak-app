@@ -2,15 +2,33 @@ import { ipcMain, dialog, BrowserWindow, shell } from 'electron';
 import fs from 'node:fs';
 import type Database from 'better-sqlite3';
 import { createPegawaiRepo } from '../db/pegawai-repo';
+import { createSpmBatchRepo, periodeKey } from '../db/spm-batch-repo';
 import { createWorkspaceService } from '../workspace/workspace-service';
 import { parseGajiSPM } from '../excel/spm-parser';
 import { detectKategoriFromFilename } from '../excel/categorizer';
 import { importPegawaiFromPajakFile } from '../excel/pegawai-importer';
-import { writePajakOutput } from '../excel/output-writer';
-import type { ProcessInput, ProcessResult, Pegawai, Periode } from '@shared/types';
+import { writePajakOutput, writeEmptyPajakOutput } from '../excel/output-writer';
+import { copySpmFile, deleteSpmFile } from '../spm/spm-storage';
+import type {
+  ProcessInput,
+  ProcessResult,
+  Pegawai,
+  Periode,
+  SPMBatchSummary,
+  CreatePeriodeInput
+} from '@shared/types';
+
+function periodeFromKey(key: string, listed: Periode[]): Periode | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m) return null;
+  const tahun = parseInt(m[1], 10);
+  const bulan = parseInt(m[2], 10);
+  return listed.find(p => p.tahun === tahun && p.bulan === bulan) ?? null;
+}
 
 export function registerIpcHandlers(db: Database.Database): void {
   const pegawaiRepo = createPegawaiRepo(db);
+  const spmBatchRepo = createSpmBatchRepo(db);
   const workspace = createWorkspaceService(db);
 
   ipcMain.handle('workspace:get', () => workspace.getWorkspacePath());
@@ -28,6 +46,15 @@ export function registerIpcHandlers(db: Database.Database): void {
   });
 
   ipcMain.handle('workspace:listPeriode', (): Periode[] => workspace.listPeriode());
+
+  ipcMain.handle('workspace:createPeriode', async (_e, input: CreatePeriodeInput): Promise<Periode> => {
+    const periode = workspace.createPeriode(input);
+    const outputPath = workspace.resolveOutputPath(periode);
+    const pegawai = pegawaiRepo.list();
+    await writeEmptyPajakOutput({ outputPath, pegawai, periode });
+    workspace.ensurePeriodeFolder(periode);
+    return periode;
+  });
 
   ipcMain.handle('pegawai:list', (): Pegawai[] => pegawaiRepo.list());
 
@@ -62,6 +89,28 @@ export function registerIpcHandlers(db: Database.Database): void {
     return await parseGajiSPM(filePath);
   });
 
+  ipcMain.handle('spm:listByPeriode', (_e, periode: Periode): SPMBatchSummary[] => {
+    return spmBatchRepo.listSummariesByPeriode(periodeKey(periode));
+  });
+
+  ipcMain.handle('spm:delete', async (_e, batchId: number): Promise<void> => {
+    const batch = spmBatchRepo.findById(batchId);
+    if (!batch) throw new Error(`Batch ${batchId} tidak ditemukan.`);
+
+    spmBatchRepo.delete(batchId);
+    deleteSpmFile(batch.storedFile);
+
+    const periode = periodeFromKey(batch.periode, workspace.listPeriode());
+    if (!periode) return;
+    const outputPath = workspace.resolveOutputPath(periode);
+    const pegawai = pegawaiRepo.list();
+    const remaining = spmBatchRepo.listByPeriode(batch.periode);
+    const gajiRows = remaining
+      .filter(b => b.kategori === 'gaji')
+      .map(b => ({ rows: b.rows, keterangan: b.keterangan, noSPM: b.noSPM }));
+    await writePajakOutput({ outputPath, pegawai, gajiRows, periode });
+  });
+
   ipcMain.handle('process:run', async (_e, input: ProcessInput): Promise<ProcessResult> => {
     const outputPath = workspace.resolveOutputPath(input.periode);
     const pegawai = pegawaiRepo.list();
@@ -74,14 +123,50 @@ export function registerIpcHandlers(db: Database.Database): void {
       const preview = missing.slice(0, 3).join(', ');
       throw new Error(`${missing.length} NIP belum ada di master Pegawai: ${preview}${missing.length > 3 ? '...' : ''}`);
     }
+    const pKey = periodeKey(input.periode);
+    if (spmBatchRepo.has(pKey, input.noSPM)) {
+      throw new Error(`No SPM "${input.noSPM}" sudah pernah diproses untuk periode ${input.periode.label}.`);
+    }
+
+    const workspacePath = workspace.getWorkspacePath();
+    if (!workspacePath) throw new Error('Workspace belum dipilih.');
+
+    let storedFile: string | null = null;
+    try {
+      storedFile = copySpmFile(
+        input.parsedSPM.filePath,
+        workspacePath,
+        input.periode,
+        input.noSPM,
+        'gaji'
+      );
+    } catch (e) {
+      throw new Error(`Gagal arsip file SPM: ${(e as Error).message}`);
+    }
+
+    try {
+      spmBatchRepo.insert(
+        pKey,
+        input.noSPM,
+        input.keterangan,
+        input.parsedSPM.kategori,
+        storedFile,
+        input.parsedSPM.rows
+      );
+    } catch (e) {
+      deleteSpmFile(storedFile);
+      throw e;
+    }
+
+    const batches = spmBatchRepo.listByPeriode(pKey);
+    const gajiRows = batches
+      .filter(b => b.kategori === 'gaji')
+      .map(b => ({ rows: b.rows, keterangan: b.keterangan, noSPM: b.noSPM }));
+
     return await writePajakOutput({
       outputPath,
       pegawai,
-      gajiRows: [{
-        rows: input.parsedSPM.rows,
-        keterangan: input.keterangan,
-        noSPM: input.noSPM
-      }],
+      gajiRows,
       periode: input.periode
     });
   });

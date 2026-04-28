@@ -101,3 +101,18 @@ export async function writePajakOutput(opts: WriteOptions): Promise<ProcessResul
 
   return { outputPath, rowsWritten };
 }
+
+export interface EmptyWriteOptions {
+  outputPath: string;
+  pegawai: Pegawai[];
+  periode: Periode;
+}
+
+export async function writeEmptyPajakOutput(opts: EmptyWriteOptions): Promise<ProcessResult> {
+  return writePajakOutput({
+    outputPath: opts.outputPath,
+    pegawai: opts.pegawai,
+    gajiRows: [],
+    periode: opts.periode
+  });
+}

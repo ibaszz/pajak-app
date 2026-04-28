@@ -30,10 +30,44 @@ CREATE TABLE IF NOT EXISTS process_log (
   rows_count   INTEGER,
   processed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS spm_batch (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  periode     TEXT NOT NULL,
+  no_spm      TEXT NOT NULL,
+  keterangan  TEXT NOT NULL,
+  kategori    TEXT NOT NULL,
+  stored_file TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(periode, no_spm)
+);
+
+CREATE TABLE IF NOT EXISTS spm_row (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id   INTEGER NOT NULL REFERENCES spm_batch(id) ON DELETE CASCADE,
+  nip        TEXT NOT NULL,
+  nama       TEXT NOT NULL,
+  gjpokok    REAL NOT NULL,
+  tjberas    REAL NOT NULL,
+  tjpph      REAL NOT NULL,
+  potpfk10   REAL NOT NULL,
+  row_order  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_spm_row_batch ON spm_row(batch_id);
 `;
+
+function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some(c => c.name === column)) {
+    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${ddl}`).run();
+  }
+}
 
 export function applyMigrations(db: Database.Database): void {
   db.exec(SCHEMA_SQL);
+  // Add columns to existing tables (CREATE TABLE IF NOT EXISTS skips if table exists)
+  ensureColumn(db, 'spm_batch', 'stored_file', 'stored_file TEXT');
 }
 
 export function openDatabase(userDataDir: string): Database.Database {
