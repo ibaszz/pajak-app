@@ -5,8 +5,18 @@ import { createSpmBatchRepo, periodeKey } from '../../src/main/db/spm-batch-repo
 import type { SPMGajiRow } from '../../src/shared/types';
 
 const ROWS: SPMGajiRow[] = [
-  { nip: '1001', nama: 'Alice', gjpokok: 5_000_000, tjberas: 300_000, tjpph: 150_000, potpfk10: 50_000 },
-  { nip: '1002', nama: 'Bob',   gjpokok: 3_500_000, tjberas: 200_000, tjpph:  80_000, potpfk10: 30_000 }
+  {
+    nip: '1001', nama: 'Alice',
+    gjpokok: 5_000_000,
+    tjistri: 0, tjanak: 0, tjupns: 0, tjstruk: 0, tjfungs: 0, pembul: 0,
+    tjberas: 300_000, tjpph: 150_000, potpfk10: 50_000
+  },
+  {
+    nip: '1002', nama: 'Bob',
+    gjpokok: 3_500_000,
+    tjistri: 0, tjanak: 0, tjupns: 0, tjstruk: 0, tjfungs: 0, pembul: 0,
+    tjberas: 200_000, tjpph: 80_000, potpfk10: 30_000
+  }
 ];
 
 const PKEY = '2026-03';

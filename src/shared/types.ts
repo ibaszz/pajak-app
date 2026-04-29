@@ -23,6 +23,12 @@ export interface SPMGajiRow {
   nip: string;
   nama: string;
   gjpokok: number;
+  tjistri: number;
+  tjanak: number;
+  tjupns: number;
+  tjstruk: number;
+  tjfungs: number;
+  pembul: number;
   tjberas: number;
   tjpph: number;
   potpfk10: number;

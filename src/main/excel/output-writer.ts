@@ -68,7 +68,9 @@ function buildGajiLedgerSheet(wb: ExcelJS.Workbook, batches: GajiBatch[], refCou
         nik: { formula: `VLOOKUP(A${excelRow},${refRange},2,FALSE)` },
         nama: { formula: `VLOOKUP(A${excelRow},${refRange},3,FALSE)` },
         status: { formula: `VLOOKUP(A${excelRow},${refRange},4,FALSE)` },
-        nominal: r.gjpokok + r.tjberas,
+        nominal:
+          r.gjpokok + r.tjistri + r.tjanak + r.tjupns +
+          r.tjstruk + r.tjfungs + r.pembul + r.tjberas,
         pph: r.tjpph,
         tunjPph: r.tjpph,
         potpfk10: r.potpfk10,
