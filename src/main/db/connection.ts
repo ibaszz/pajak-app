@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS spm_row (
   nip        TEXT NOT NULL,
   nama       TEXT NOT NULL,
   gjpokok    REAL NOT NULL,
+  tjistri    REAL NOT NULL DEFAULT 0,
+  tjanak     REAL NOT NULL DEFAULT 0,
+  tjupns     REAL NOT NULL DEFAULT 0,
+  tjstruk    REAL NOT NULL DEFAULT 0,
+  tjfungs    REAL NOT NULL DEFAULT 0,
+  pembul     REAL NOT NULL DEFAULT 0,
   tjberas    REAL NOT NULL,
   tjpph      REAL NOT NULL,
   potpfk10   REAL NOT NULL,
@@ -68,6 +74,12 @@ export function applyMigrations(db: Database.Database): void {
   db.exec(SCHEMA_SQL);
   // Add columns to existing tables (CREATE TABLE IF NOT EXISTS skips if table exists)
   ensureColumn(db, 'spm_batch', 'stored_file', 'stored_file TEXT');
+  ensureColumn(db, 'spm_row', 'tjistri', 'tjistri REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'spm_row', 'tjanak',  'tjanak  REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'spm_row', 'tjupns',  'tjupns  REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'spm_row', 'tjstruk', 'tjstruk REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'spm_row', 'tjfungs', 'tjfungs REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'spm_row', 'pembul',  'pembul  REAL NOT NULL DEFAULT 0');
 }
 
 export function openDatabase(userDataDir: string): Database.Database {

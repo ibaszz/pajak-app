@@ -17,8 +17,18 @@ const PEGAWAI: Pegawai[] = [
 ];
 
 const ROWS: SPMGajiRow[] = [
-  { nip: '1001', nama: 'Alice', gjpokok: 5_000_000, tjberas: 300_000, tjpph: 150_000, potpfk10: 50_000 },
-  { nip: '1002', nama: 'Bob',   gjpokok: 3_500_000, tjberas: 200_000, tjpph:  80_000, potpfk10: 30_000 }
+  {
+    nip: '1001', nama: 'Alice',
+    gjpokok: 5_000_000,
+    tjistri: 0, tjanak: 0, tjupns: 0, tjstruk: 0, tjfungs: 0, pembul: 0,
+    tjberas: 300_000, tjpph: 150_000, potpfk10: 50_000
+  },
+  {
+    nip: '1002', nama: 'Bob',
+    gjpokok: 3_500_000,
+    tjistri: 0, tjanak: 0, tjupns: 0, tjstruk: 0, tjfungs: 0, pembul: 0,
+    tjberas: 200_000, tjpph: 80_000, potpfk10: 30_000
+  }
 ];
 
 const PERIODE: Periode = { nomorUrut: 3, bulan: 3, tahun: 2026, label: 'Maret 2026' };
@@ -90,6 +100,39 @@ describe('writePajakOutput', () => {
     const ledger = wb.getWorksheet('Gaji Ledger');
     expect(ledger).toBeDefined();
     expect(ledger!.rowCount).toBe(1); // header only
+  });
+
+  it('nominal sums all PNS allowance components', async () => {
+    const outPath = tmpFile();
+    const row: SPMGajiRow = {
+      nip: '1001', nama: 'Alice',
+      gjpokok: 5_000_000,
+      tjistri: 500_000,
+      tjanak: 200_000,
+      tjupns: 185_000,
+      tjstruk: 540_000,
+      tjfungs: 0,
+      pembul: 75,
+      tjberas: 300_000,
+      tjpph: 150_000,
+      potpfk10: 50_000
+    };
+    await writePajakOutput({
+      outputPath: outPath,
+      pegawai: PEGAWAI,
+      gajiRows: [{ rows: [row], keterangan: 'k', noSPM: 'X' }],
+      periode: PERIODE
+    });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(outPath);
+    const ledger = wb.getWorksheet('Gaji Ledger')!;
+    const headers: string[] = [];
+    ledger.getRow(1).eachCell((c, i) => { headers[i] = String(c.value); });
+    const nominalCol = headers.findIndex(h => h?.toLowerCase() === 'nominal');
+    const expected =
+      row.gjpokok + row.tjistri + row.tjanak + row.tjupns +
+      row.tjstruk + row.tjfungs + row.pembul + row.tjberas;
+    expect(Number(ledger.getRow(2).getCell(nominalCol).value)).toBe(expected);
   });
 
   it('overwrites existing output file', async () => {

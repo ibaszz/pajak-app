@@ -30,6 +30,16 @@ function numericValue(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function optionalNumeric(
+  row: ExcelJS.Row,
+  headerIdx: Record<string, number>,
+  key: string
+): number {
+  const col = headerIdx[key];
+  if (col == null) return 0;
+  return numericValue(row.getCell(col).value);
+}
+
 function stringValue(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'string') return v.trim();
@@ -75,6 +85,12 @@ export async function parseGajiSPM(filePath: string): Promise<ParsedSPM> {
       nip,
       nama: stringValue(row.getCell(headerIdx.nama).value),
       gjpokok: numericValue(row.getCell(headerIdx.gjpokok).value),
+      tjistri: optionalNumeric(row, headerIdx, 'tjistri'),
+      tjanak: optionalNumeric(row, headerIdx, 'tjanak'),
+      tjupns: optionalNumeric(row, headerIdx, 'tjupns'),
+      tjstruk: optionalNumeric(row, headerIdx, 'tjstruk'),
+      tjfungs: optionalNumeric(row, headerIdx, 'tjfungs'),
+      pembul: optionalNumeric(row, headerIdx, 'pembul'),
       tjberas: numericValue(row.getCell(headerIdx.tjberas).value),
       tjpph: numericValue(row.getCell(headerIdx.tjpph).value),
       potpfk10: numericValue(row.getCell(headerIdx.potpfk10).value)

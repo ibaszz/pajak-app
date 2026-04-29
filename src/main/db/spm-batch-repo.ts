@@ -25,6 +25,12 @@ interface SpmRowRow {
   nip: string;
   nama: string;
   gjpokok: number;
+  tjistri: number;
+  tjanak: number;
+  tjupns: number;
+  tjstruk: number;
+  tjfungs: number;
+  pembul: number;
   tjberas: number;
   tjpph: number;
   potpfk10: number;
@@ -49,9 +55,19 @@ export function createSpmBatchRepo(db: Database.Database) {
     `INSERT INTO spm_batch (periode, no_spm, keterangan, kategori, stored_file)
      VALUES (?, ?, ?, ?, ?)`
   );
-  const insertRowStmt = db.prepare<[number, string, string, number, number, number, number, number]>(
-    `INSERT INTO spm_row (batch_id, nip, nama, gjpokok, tjberas, tjpph, potpfk10, row_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  const insertRowStmt = db.prepare<[
+    number, string, string,
+    number, number, number, number, number, number, number,
+    number, number, number,
+    number
+  ]>(
+    `INSERT INTO spm_row (
+       batch_id, nip, nama,
+       gjpokok, tjistri, tjanak, tjupns, tjstruk, tjfungs, pembul,
+       tjberas, tjpph, potpfk10,
+       row_order
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const findByNoSpmStmt = db.prepare<[string, string], { id: number }>(
     `SELECT id FROM spm_batch WHERE periode = ? AND no_spm = ?`
@@ -66,7 +82,9 @@ export function createSpmBatchRepo(db: Database.Database) {
      ORDER BY created_at ASC, id ASC`
   );
   const listRowsStmt = db.prepare<[number], SpmRowRow>(
-    `SELECT nip, nama, gjpokok, tjberas, tjpph, potpfk10
+    `SELECT nip, nama, gjpokok,
+            tjistri, tjanak, tjupns, tjstruk, tjfungs, pembul,
+            tjberas, tjpph, potpfk10
      FROM spm_row WHERE batch_id = ? ORDER BY row_order ASC`
   );
   const listSummariesStmt = db.prepare<[string], BatchSummaryRow>(
@@ -90,7 +108,12 @@ export function createSpmBatchRepo(db: Database.Database) {
       const info = insertBatchStmt.run(periode, noSPM, keterangan, kategori, storedFile);
       const batchId = Number(info.lastInsertRowid);
       rows.forEach((r, i) => {
-        insertRowStmt.run(batchId, r.nip, r.nama, r.gjpokok, r.tjberas, r.tjpph, r.potpfk10, i);
+        insertRowStmt.run(
+          batchId, r.nip, r.nama,
+          r.gjpokok, r.tjistri, r.tjanak, r.tjupns, r.tjstruk, r.tjfungs, r.pembul,
+          r.tjberas, r.tjpph, r.potpfk10,
+          i
+        );
       });
       return batchId;
     }

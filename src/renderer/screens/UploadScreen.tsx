@@ -206,20 +206,27 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
                 <th className="p-1 text-left">Nama</th>
                 <th className="p-1 text-right">Gjpokok</th>
                 <th className="p-1 text-right">Tjberas</th>
+                <th className="p-1 text-right">Nominal</th>
                 <th className="p-1 text-right">Tjpph</th>
                 <th className="p-1 text-right">potpfk10</th>
               </tr></thead>
               <tbody>
-                {parsed.rows.slice(0, 50).map((r) => (
-                  <tr key={r.nip} className="border-t">
-                    <td className="p-1 font-mono">{r.nip}</td>
-                    <td className="p-1">{r.nama}</td>
-                    <td className="p-1 text-right">{r.gjpokok.toLocaleString('id-ID')}</td>
-                    <td className="p-1 text-right">{r.tjberas.toLocaleString('id-ID')}</td>
-                    <td className="p-1 text-right">{r.tjpph.toLocaleString('id-ID')}</td>
-                    <td className="p-1 text-right">{r.potpfk10.toLocaleString('id-ID')}</td>
-                  </tr>
-                ))}
+                {parsed.rows.slice(0, 50).map((r) => {
+                  const nominal =
+                    r.gjpokok + r.tjistri + r.tjanak + r.tjupns +
+                    r.tjstruk + r.tjfungs + r.pembul + r.tjberas;
+                  return (
+                    <tr key={r.nip} className="border-t">
+                      <td className="p-1 font-mono">{r.nip}</td>
+                      <td className="p-1">{r.nama}</td>
+                      <td className="p-1 text-right">{r.gjpokok.toLocaleString('id-ID')}</td>
+                      <td className="p-1 text-right">{r.tjberas.toLocaleString('id-ID')}</td>
+                      <td className="p-1 text-right font-medium">{nominal.toLocaleString('id-ID')}</td>
+                      <td className="p-1 text-right">{r.tjpph.toLocaleString('id-ID')}</td>
+                      <td className="p-1 text-right">{r.potpfk10.toLocaleString('id-ID')}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
