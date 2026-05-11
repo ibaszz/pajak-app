@@ -1,7 +1,120 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
-import type { ParsedSPM, Periode, ProcessResult, SPMBatchSummary } from '@shared/types';
+import type {
+  Kategori,
+  ParsedSPM,
+  Periode,
+  ProcessResult,
+  SPMBatchSummary,
+  SPMGajiRow,
+  SPMTunjanganRow,
+  SPMUangMakanRow
+} from '@shared/types';
 import ConfirmDialog from '../components/ConfirmDialog';
+
+const KATEGORI_LABEL: Record<Kategori, string> = {
+  gaji: 'Gaji',
+  tunjangan: 'Tunjangan',
+  uang_makan: 'Uang Makan'
+};
+
+const KATEGORI_COLOR: Record<Kategori, string> = {
+  gaji: 'bg-blue-100 text-blue-700',
+  tunjangan: 'bg-amber-100 text-amber-700',
+  uang_makan: 'bg-emerald-100 text-emerald-700'
+};
+
+function KategoriBadge({ kategori }: { kategori: Kategori }) {
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${KATEGORI_COLOR[kategori]}`}>
+      {KATEGORI_LABEL[kategori]}
+    </span>
+  );
+}
+
+function GajiPreview({ rows }: { rows: SPMGajiRow[] }) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="bg-slate-100"><tr>
+        <th className="p-1 text-left">NIP</th>
+        <th className="p-1 text-left">Nama</th>
+        <th className="p-1 text-right">Gjpokok</th>
+        <th className="p-1 text-right">Tjberas</th>
+        <th className="p-1 text-right">Nominal</th>
+        <th className="p-1 text-right">Tjpph</th>
+        <th className="p-1 text-right">potpfk10</th>
+      </tr></thead>
+      <tbody>
+        {rows.slice(0, 50).map((r) => {
+          const nominal =
+            r.gjpokok + r.tjistri + r.tjanak + r.tjupns +
+            r.tjstruk + r.tjfungs + r.pembul + r.tjberas;
+          return (
+            <tr key={r.nip} className="border-t">
+              <td className="p-1 font-mono">{r.nip}</td>
+              <td className="p-1">{r.nama}</td>
+              <td className="p-1 text-right">{r.gjpokok.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right">{r.tjberas.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right font-medium">{nominal.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right">{r.tjpph.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right">{r.potpfk10.toLocaleString('id-ID')}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function TunjanganPreview({ rows }: { rows: SPMTunjanganRow[] }) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="bg-slate-100"><tr>
+        <th className="p-1 text-left">NIP</th>
+        <th className="p-1 text-left">Nama</th>
+        <th className="p-1 text-right">Bersih</th>
+        <th className="p-1 text-right">Pajak</th>
+      </tr></thead>
+      <tbody>
+        {rows.slice(0, 50).map((r) => (
+          <tr key={r.nip} className="border-t">
+            <td className="p-1 font-mono">{r.nip}</td>
+            <td className="p-1">{r.nama}</td>
+            <td className="p-1 text-right font-medium">{r.bersih.toLocaleString('id-ID')}</td>
+            <td className="p-1 text-right">{r.pajak.toLocaleString('id-ID')}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function UangMakanPreview({ rows }: { rows: SPMUangMakanRow[] }) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="bg-slate-100"><tr>
+        <th className="p-1 text-left">NIP</th>
+        <th className="p-1 text-left">Nama</th>
+        <th className="p-1 text-right">Kotor</th>
+        <th className="p-1 text-right">Potongan</th>
+        <th className="p-1 text-right">Bersih</th>
+        <th className="p-1 text-right">PPH</th>
+      </tr></thead>
+      <tbody>
+        {rows.slice(0, 50).map((r) => (
+          <tr key={r.nip} className="border-t">
+            <td className="p-1 font-mono">{r.nip}</td>
+            <td className="p-1">{r.nama}</td>
+            <td className="p-1 text-right">{r.kotor.toLocaleString('id-ID')}</td>
+            <td className="p-1 text-right">{r.potongan.toLocaleString('id-ID')}</td>
+            <td className="p-1 text-right font-medium">{r.bersih.toLocaleString('id-ID')}</td>
+            <td className="p-1 text-right">{r.pph.toLocaleString('id-ID')}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export default function UploadScreen({ workspacePath }: { workspacePath: string | null }) {
   const [parsed, setParsed] = useState<ParsedSPM | null>(null);
@@ -124,6 +237,7 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
                 <thead className="bg-slate-100">
                   <tr>
                     <th className="p-2 text-left">No SPM</th>
+                    <th className="p-2 text-left">Kategori</th>
                     <th className="p-2 text-left">Keterangan</th>
                     <th className="p-2 text-right">Baris</th>
                     <th className="p-2 text-left">Tanggal Upload</th>
@@ -134,6 +248,7 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
                   {batches.map((b) => (
                     <tr key={b.id} className="border-t">
                       <td className="p-2 font-mono">{b.noSPM}</td>
+                      <td className="p-2"><KategoriBadge kategori={b.kategori} /></td>
                       <td className="p-2">{b.keterangan}</td>
                       <td className="p-2 text-right">{b.rowCount}</td>
                       <td className="p-2 text-slate-600">{b.createdAt}</td>
@@ -156,14 +271,14 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
 
       {selectedPeriode && (
         <div className="bg-white rounded border p-4 mb-4">
-          <div className="text-sm font-medium mb-2">2. Pilih file SPM (Gaji)</div>
+          <div className="text-sm font-medium mb-2">2. Pilih file SPM (Gaji / Tunjangan / Uang Makan)</div>
           <button onClick={pickFile} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
             Pilih file...
           </button>
           {parsed && (
             <div className="mt-3 text-sm">
               <div><span className="text-slate-500">File:</span> {parsed.fileName}</div>
-              <div><span className="text-slate-500">Kategori:</span> {parsed.kategori}</div>
+              <div><span className="text-slate-500">Kategori:</span> <KategoriBadge kategori={parsed.kategori} /></div>
               <div><span className="text-slate-500">Jumlah baris:</span> {parsed.rowCount}</div>
             </div>
           )}
@@ -200,35 +315,9 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
         <div className="bg-white rounded border p-4 mb-4">
           <div className="text-sm font-medium mb-2">4. Preview ({parsed.rowCount} baris)</div>
           <div className="max-h-64 overflow-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-100"><tr>
-                <th className="p-1 text-left">NIP</th>
-                <th className="p-1 text-left">Nama</th>
-                <th className="p-1 text-right">Gjpokok</th>
-                <th className="p-1 text-right">Tjberas</th>
-                <th className="p-1 text-right">Nominal</th>
-                <th className="p-1 text-right">Tjpph</th>
-                <th className="p-1 text-right">potpfk10</th>
-              </tr></thead>
-              <tbody>
-                {parsed.rows.slice(0, 50).map((r) => {
-                  const nominal =
-                    r.gjpokok + r.tjistri + r.tjanak + r.tjupns +
-                    r.tjstruk + r.tjfungs + r.pembul + r.tjberas;
-                  return (
-                    <tr key={r.nip} className="border-t">
-                      <td className="p-1 font-mono">{r.nip}</td>
-                      <td className="p-1">{r.nama}</td>
-                      <td className="p-1 text-right">{r.gjpokok.toLocaleString('id-ID')}</td>
-                      <td className="p-1 text-right">{r.tjberas.toLocaleString('id-ID')}</td>
-                      <td className="p-1 text-right font-medium">{nominal.toLocaleString('id-ID')}</td>
-                      <td className="p-1 text-right">{r.tjpph.toLocaleString('id-ID')}</td>
-                      <td className="p-1 text-right">{r.potpfk10.toLocaleString('id-ID')}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {parsed.kategori === 'gaji' && <GajiPreview rows={parsed.rows} />}
+            {parsed.kategori === 'tunjangan' && <TunjanganPreview rows={parsed.rows} />}
+            {parsed.kategori === 'uang_makan' && <UangMakanPreview rows={parsed.rows} />}
           </div>
           {parsed.rowCount > 50 && <div className="text-xs text-slate-500 mt-1">...showing first 50 rows</div>}
         </div>

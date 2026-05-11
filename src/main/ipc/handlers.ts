@@ -2,19 +2,22 @@ import { ipcMain, dialog, BrowserWindow, shell } from 'electron';
 import fs from 'node:fs';
 import type Database from 'better-sqlite3';
 import { createPegawaiRepo } from '../db/pegawai-repo';
-import { createSpmBatchRepo, periodeKey } from '../db/spm-batch-repo';
+import { createSpmBatchRepo, periodeKey, type SPMBatch } from '../db/spm-batch-repo';
 import { createWorkspaceService } from '../workspace/workspace-service';
-import { parseGajiSPM } from '../excel/spm-parser';
+import { parseSPMByKategori } from '../excel/spm-parser';
 import { detectKategoriFromFilename } from '../excel/categorizer';
 import { importPegawaiFromPajakFile } from '../excel/pegawai-importer';
 import { writePajakOutput, writeEmptyPajakOutput } from '../excel/output-writer';
-import { copySpmFile, deleteSpmFile } from '../spm/spm-storage';
+import { copySpmFile, deleteSpmFile, determinePnsSuffix } from '../spm/spm-storage';
 import type {
   ProcessInput,
   ProcessResult,
   Pegawai,
   Periode,
   SPMBatchSummary,
+  SPMGajiRow,
+  SPMTunjanganRow,
+  SPMUangMakanRow,
   CreatePeriodeInput
 } from '@shared/types';
 
@@ -24,6 +27,29 @@ function periodeFromKey(key: string, listed: Periode[]): Periode | null {
   const tahun = parseInt(m[1], 10);
   const bulan = parseInt(m[2], 10);
   return listed.find(p => p.tahun === tahun && p.bulan === bulan) ?? null;
+}
+
+interface PartitionedBatches {
+  gajiRows: { rows: SPMGajiRow[]; keterangan: string; noSPM: string }[];
+  tunjanganRows: { rows: SPMTunjanganRow[]; keterangan: string; noSPM: string }[];
+  uangMakanRows: { rows: SPMUangMakanRow[]; keterangan: string; noSPM: string }[];
+}
+
+function partitionBatches(batches: SPMBatch[]): PartitionedBatches {
+  const gajiRows: PartitionedBatches['gajiRows'] = [];
+  const tunjanganRows: PartitionedBatches['tunjanganRows'] = [];
+  const uangMakanRows: PartitionedBatches['uangMakanRows'] = [];
+  for (const b of batches) {
+    const meta = { keterangan: b.keterangan, noSPM: b.noSPM };
+    if (b.kategori === 'gaji') {
+      gajiRows.push({ rows: b.rows as SPMGajiRow[], ...meta });
+    } else if (b.kategori === 'tunjangan') {
+      tunjanganRows.push({ rows: b.rows as SPMTunjanganRow[], ...meta });
+    } else {
+      uangMakanRows.push({ rows: b.rows as SPMUangMakanRow[], ...meta });
+    }
+  }
+  return { gajiRows, tunjanganRows, uangMakanRows };
 }
 
 export function registerIpcHandlers(db: Database.Database): void {
@@ -83,10 +109,13 @@ export function registerIpcHandlers(db: Database.Database): void {
     if (r.canceled || r.filePaths.length === 0) return null;
     const filePath = r.filePaths[0];
     const kategori = detectKategoriFromFilename(filePath);
-    if (kategori !== 'gaji') {
-      throw new Error(`MVP hanya support kategori Gaji. Terdeteksi: ${kategori ?? 'tidak dikenal'}`);
+    if (kategori === null) {
+      throw new Error(
+        `Kategori tidak dikenal dari nama file. ` +
+        `Gaji: gaji_bank|lampiranspm; Tunjangan: tukin|tunsus; Uang Makan: uangmakan|um <spasi>.`
+      );
     }
-    return await parseGajiSPM(filePath);
+    return await parseSPMByKategori(filePath, kategori);
   });
 
   ipcMain.handle('spm:listByPeriode', (_e, periode: Periode): SPMBatchSummary[] => {
@@ -105,10 +134,8 @@ export function registerIpcHandlers(db: Database.Database): void {
     const outputPath = workspace.resolveOutputPath(periode);
     const pegawai = pegawaiRepo.list();
     const remaining = spmBatchRepo.listByPeriode(batch.periode);
-    const gajiRows = remaining
-      .filter(b => b.kategori === 'gaji')
-      .map(b => ({ rows: b.rows, keterangan: b.keterangan, noSPM: b.noSPM }));
-    await writePajakOutput({ outputPath, pegawai, gajiRows, periode });
+    const partitioned = partitionBatches(remaining);
+    await writePajakOutput({ outputPath, pegawai, ...partitioned, periode });
   });
 
   ipcMain.handle('process:run', async (_e, input: ProcessInput): Promise<ProcessResult> => {
@@ -131,6 +158,8 @@ export function registerIpcHandlers(db: Database.Database): void {
     const workspacePath = workspace.getWorkspacePath();
     if (!workspacePath) throw new Error('Workspace belum dipilih.');
 
+    const pnsSuffix = determinePnsSuffix(input.parsedSPM.rows, pegawai);
+
     let storedFile: string | null = null;
     try {
       storedFile = copySpmFile(
@@ -138,7 +167,8 @@ export function registerIpcHandlers(db: Database.Database): void {
         workspacePath,
         input.periode,
         input.noSPM,
-        'gaji'
+        input.parsedSPM.kategori,
+        pnsSuffix
       );
     } catch (e) {
       throw new Error(`Gagal arsip file SPM: ${(e as Error).message}`);
@@ -159,14 +189,12 @@ export function registerIpcHandlers(db: Database.Database): void {
     }
 
     const batches = spmBatchRepo.listByPeriode(pKey);
-    const gajiRows = batches
-      .filter(b => b.kategori === 'gaji')
-      .map(b => ({ rows: b.rows, keterangan: b.keterangan, noSPM: b.noSPM }));
+    const partitioned = partitionBatches(batches);
 
     return await writePajakOutput({
       outputPath,
       pegawai,
-      gajiRows,
+      ...partitioned,
       periode: input.periode
     });
   });

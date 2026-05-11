@@ -15,9 +15,17 @@ export function sanitizeForFileName(s: string): string {
   return s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-export function formatSpmFileName(noSPM: string, kategori: 'gaji', bulan: number, tahun: number): string {
+import type { Kategori, PnsSuffix } from './types';
+
+export function formatSpmFileName(
+  noSPM: string,
+  kategori: Kategori,
+  bulan: number,
+  tahun: number,
+  pnsSuffix: PnsSuffix
+): string {
   const noSafe = sanitizeForFileName(noSPM);
   const bulanName = BULAN_NAMES[bulan - 1].toUpperCase();
   const kat = kategori.toUpperCase();
-  return `SPM_${noSafe}_${kat}_${bulanName}_${tahun}_PNS.xlsx`;
+  return `SPM_${noSafe}_${kat}_${bulanName}_${tahun}_${pnsSuffix}.xlsx`;
 }

@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../src/main/db/connection';
 import { createSpmBatchRepo, periodeKey } from '../../src/main/db/spm-batch-repo';
-import type { SPMGajiRow } from '../../src/shared/types';
+import type {
+  SPMGajiRow,
+  SPMTunjanganRow,
+  SPMUangMakanRow
+} from '../../src/shared/types';
 
 const ROWS: SPMGajiRow[] = [
   {
@@ -105,5 +109,43 @@ describe('spm-batch-repo', () => {
     repo.insert('2026-04', 'B', 'k', 'gaji', null, ROWS);
     expect(repo.listByPeriode(PKEY).map(b => b.noSPM)).toEqual(['A']);
     expect(repo.listByPeriode('2026-04').map(b => b.noSPM)).toEqual(['B']);
+  });
+
+  it('round-trip tunjangan rows', () => {
+    const tunjRows: SPMTunjanganRow[] = [
+      { nip: '1001', nama: 'Alice', bersih: 4_900_000, pajak: 245_000 },
+      { nip: '1002', nama: 'Bob', bersih: 3_920_000, pajak: 0 }
+    ];
+    const id = repo.insert(PKEY, 'TJ001', 'Tukin Maret', 'tunjangan', null, tunjRows);
+    const found = repo.findById(id);
+    expect(found).not.toBeNull();
+    expect(found!.kategori).toBe('tunjangan');
+    expect(found!.rows).toEqual(tunjRows);
+  });
+
+  it('round-trip uang_makan rows', () => {
+    const umRows: SPMUangMakanRow[] = [
+      { nip: '1001', nama: 'Alice', kotor: 500_000, potongan: 0, bersih: 500_000, pph: 0 },
+      { nip: '1002', nama: 'Bob', kotor: 400_000, potongan: 0, bersih: 375_000, pph: 25_000 }
+    ];
+    const id = repo.insert(PKEY, 'UM001', 'Uang Makan Maret', 'uang_makan', null, umRows);
+    const found = repo.findById(id);
+    expect(found).not.toBeNull();
+    expect(found!.kategori).toBe('uang_makan');
+    expect(found!.rows).toEqual(umRows);
+  });
+
+  it('mixed kategori in same periode listed in insert order', () => {
+    const gajiRow: SPMGajiRow = ROWS[0];
+    const tunjRow: SPMTunjanganRow = { nip: '1001', nama: 'Alice', bersih: 100, pajak: 5 };
+    const umRow: SPMUangMakanRow = { nip: '1001', nama: 'Alice', kotor: 50, potongan: 0, bersih: 50, pph: 0 };
+    repo.insert(PKEY, 'A', 'k', 'gaji', null, [gajiRow]);
+    repo.insert(PKEY, 'B', 'k', 'tunjangan', null, [tunjRow]);
+    repo.insert(PKEY, 'C', 'k', 'uang_makan', null, [umRow]);
+    const list = repo.listByPeriode(PKEY);
+    expect(list.map(b => b.kategori)).toEqual(['gaji', 'tunjangan', 'uang_makan']);
+    expect(list[0].rows[0]).toEqual(gajiRow);
+    expect(list[1].rows[0]).toEqual(tunjRow);
+    expect(list[2].rows[0]).toEqual(umRow);
   });
 });
