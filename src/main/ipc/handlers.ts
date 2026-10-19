@@ -9,6 +9,9 @@ import { detectKategoriFromFilename } from '../excel/categorizer';
 import { importPegawaiFromPajakFile } from '../excel/pegawai-importer';
 import { writePajakOutput, writeEmptyPajakOutput } from '../excel/output-writer';
 import { copySpmFile, deleteSpmFile, determinePnsSuffix } from '../spm/spm-storage';
+import { detectPdfKindFromFilename, detectPdfKindFromText } from '../pdf/pdf-categorizer';
+import { extractPdfText } from '../pdf/pdf-text-extractor';
+import { parsePdfFile, finalizePdfToSPM } from '../pdf/pdf-to-spm';
 import type {
   ProcessInput,
   ProcessResult,
@@ -18,7 +21,10 @@ import type {
   SPMGajiRow,
   SPMTunjanganRow,
   SPMUangMakanRow,
-  CreatePeriodeInput
+  CreatePeriodeInput,
+  ParsedPdf,
+  ParsedSPM,
+  PdfRowOverrides
 } from '@shared/types';
 
 function periodeFromKey(key: string, listed: Periode[]): Periode | null {
@@ -137,6 +143,42 @@ export function registerIpcHandlers(db: Database.Database): void {
     const partitioned = partitionBatches(remaining);
     await writePajakOutput({ outputPath, pegawai, ...partitioned, periode });
   });
+
+  ipcMain.handle('pdf:pickAndParse', async (): Promise<ParsedPdf | null> => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) return null;
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Pilih file PDF (Uang Makan atau Honorarium)',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      properties: ['openFile']
+    });
+    if (r.canceled || r.filePaths.length === 0) return null;
+    const filePath = r.filePaths[0];
+    const buffer = fs.readFileSync(filePath);
+
+    let kind = detectPdfKindFromFilename(filePath);
+    if (!kind) {
+      const text = await extractPdfText(buffer);
+      kind = detectPdfKindFromText(text);
+    }
+    if (!kind) {
+      throw new Error(
+        `Jenis PDF tidak dikenal dari nama file maupun isi dokumen. ` +
+        `Uang Makan: nama file mengandung "uangmakan"/"UM ", isi "Daftar Perhitungan Uang Makan". ` +
+        `Honorarium: nama file mengandung "honor", isi "Daftar Pembayaran Honorarium".`
+      );
+    }
+
+    const pegawai = pegawaiRepo.list();
+    return await parsePdfFile(filePath, kind, pegawai, buffer);
+  });
+
+  ipcMain.handle(
+    'pdf:finalize',
+    (_e, parsedPdf: ParsedPdf, overrides: PdfRowOverrides): ParsedSPM => {
+      return finalizePdfToSPM(parsedPdf, overrides);
+    }
+  );
 
   ipcMain.handle('process:run', async (_e, input: ProcessInput): Promise<ProcessResult> => {
     const outputPath = workspace.resolveOutputPath(input.periode);

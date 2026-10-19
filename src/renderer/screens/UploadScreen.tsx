@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import type {
   Kategori,
+  ParsedPdf,
   ParsedSPM,
   Periode,
+  PdfRowOverrides,
   ProcessResult,
   SPMBatchSummary,
   SPMGajiRow,
@@ -164,8 +166,80 @@ function UangMakanPreview({ rows }: { rows: SPMUangMakanRow[] }) {
   );
 }
 
+const PDF_SOURCE_LABEL: Record<ParsedPdf['sourceKind'], string> = {
+  uang_makan_pdf: 'PDF Uang Makan',
+  honorarium_pdf: 'PDF Honorarium'
+};
+
+function PdfRowReview({
+  parsedPdf,
+  overrides,
+  onOverride
+}: {
+  parsedPdf: ParsedPdf;
+  overrides: PdfRowOverrides;
+  onOverride: (rowIdx: number, nip: string) => void;
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="bg-slate-100"><tr>
+        <th className="p-1 text-left">Nama (dari PDF)</th>
+        <th className="p-1 text-right">Kotor</th>
+        <th className="p-1 text-right">Potongan</th>
+        <th className="p-1 text-right">Bersih</th>
+        <th className="p-1 text-right">PPh %</th>
+        <th className="p-1 text-left">Status Match</th>
+        <th className="p-1 text-left">NIP Terpilih</th>
+      </tr></thead>
+      <tbody>
+        {parsedPdf.rows.map((r, i) => {
+          const resolvedNip = r.nip ?? overrides[i] ?? '';
+          const needsPick = r.matchStatus !== 'matched';
+          return (
+            <tr key={i} className={`border-t ${needsPick && !overrides[i] ? 'bg-amber-50' : ''}`}>
+              <td className="p-1">{r.namaAsli}</td>
+              <td className="p-1 text-right">{r.kotor.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right">{r.potongan.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right font-medium">{r.bersih.toLocaleString('id-ID')}</td>
+              <td className="p-1 text-right">{r.pph}</td>
+              <td className="p-1">
+                {r.matchStatus === 'matched' && <span className="text-emerald-600">Cocok otomatis</span>}
+                {r.matchStatus === 'ambiguous' && <span className="text-amber-600">Ambigu — pilih manual</span>}
+                {r.matchStatus === 'unmatched' && <span className="text-red-600">Tidak ketemu — pilih manual</span>}
+              </td>
+              <td className="p-1">
+                {needsPick ? (
+                  <select
+                    value={resolvedNip}
+                    onChange={(e) => onOverride(i, e.target.value)}
+                    className="border rounded px-1 py-0.5 text-xs w-full"
+                  >
+                    <option value="">-- pilih pegawai --</option>
+                    {r.candidates.map((c) => (
+                      <option key={c.nip} value={c.nip}>
+                        {c.nama} ({(c.score * 100).toFixed(0)}%)
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="font-mono">{resolvedNip}</span>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+
 export default function UploadScreen({ workspacePath }: { workspacePath: string | null }) {
   const [parsed, setParsed] = useState<ParsedSPM | null>(null);
+  const [parsedPdf, setParsedPdf] = useState<ParsedPdf | null>(null);
+  const [pdfOverrides, setPdfOverrides] = useState<PdfRowOverrides>({});
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfPicking, setPdfPicking] = useState(false);
   const [periode, setPeriode] = useState<Periode[]>([]);
   const [selectedPeriodeIdx, setSelectedPeriodeIdx] = useState<number>(-1);
   const [keterangan, setKeterangan] = useState('');
@@ -205,6 +279,51 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+
+  async function pickPdf() {
+    setPdfError(null);
+    setError(null);
+    setResult(null);
+    setPdfPicking(true);
+    try {
+      const r = await api.pdf.pickAndParse();
+      if (r) {
+        setParsedPdf(r);
+        setPdfOverrides({});
+        setParsed(null);
+      }
+    } catch (e) {
+      setPdfError((e as Error).message);
+    } finally {
+      setPdfPicking(false);
+    }
+  }
+
+  function setPdfOverride(rowIdx: number, nip: string) {
+    setPdfOverrides((prev) => ({ ...prev, [rowIdx]: nip }));
+  }
+
+  const pdfAllResolved =
+    !!parsedPdf && parsedPdf.rows.every((r, i) => !!(r.nip ?? pdfOverrides[i]));
+
+  async function confirmPdf() {
+    if (!parsedPdf) return;
+    setPdfError(null);
+    try {
+      const spm = await api.pdf.finalize(parsedPdf, pdfOverrides);
+      setParsed(spm);
+      setParsedPdf(null);
+      setPdfOverrides({});
+    } catch (e) {
+      setPdfError((e as Error).message);
+    }
+  }
+
+  function cancelPdf() {
+    setParsedPdf(null);
+    setPdfOverrides({});
+    setPdfError(null);
   }
 
   async function runProcess() {
@@ -321,13 +440,64 @@ export default function UploadScreen({ workspacePath }: { workspacePath: string 
         <div className="bg-white rounded border p-4 mb-4">
           <div className="text-sm font-medium mb-2">2. Pilih file SPM (Gaji / Tunjangan / Uang Makan)</div>
           <button onClick={pickFile} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-            Pilih file...
+            Pilih file Excel...
           </button>
           {parsed && (
             <div className="mt-3 text-sm">
               <div><span className="text-slate-500">File:</span> {parsed.fileName}</div>
               <div><span className="text-slate-500">Kategori:</span> <KategoriBadge kategori={parsed.kategori} /></div>
               <div><span className="text-slate-500">Jumlah baris:</span> {parsed.rowCount}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedPeriode && (
+        <div className="bg-white rounded border p-4 mb-4">
+          <div className="text-sm font-medium mb-2">2b. Atau upload PDF Uang Makan / Honorarium</div>
+          <div className="text-xs text-slate-500 mb-2">
+            PPh21 non-pegawai. Honorarium PDF tidak punya NIP, nama akan dicocokkan otomatis
+            ke master Pegawai — baris yang ambigu/tidak ketemu harus dipilih manual sebelum lanjut.
+          </div>
+          <button
+            onClick={pickPdf}
+            disabled={pdfPicking}
+            className="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {pdfPicking ? 'Membaca PDF...' : 'Pilih file PDF...'}
+          </button>
+          {pdfError && (
+            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">{pdfError}</div>
+          )}
+          {parsedPdf && (
+            <div className="mt-3">
+              <div className="text-sm mb-2">
+                <span className="text-slate-500">File:</span> {parsedPdf.fileName}{' '}
+                <span className="text-slate-500">({PDF_SOURCE_LABEL[parsedPdf.sourceKind]}, {parsedPdf.rowCount} baris)</span>
+              </div>
+              <div className="max-h-72 overflow-auto border rounded">
+                <PdfRowReview parsedPdf={parsedPdf} overrides={pdfOverrides} onOverride={setPdfOverride} />
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={confirmPdf}
+                  disabled={!pdfAllResolved}
+                  className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                >
+                  Lanjutkan ke Uang Makan
+                </button>
+                <button
+                  onClick={cancelPdf}
+                  className="px-4 py-2 border rounded text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Batal
+                </button>
+              </div>
+              {!pdfAllResolved && (
+                <div className="text-xs text-amber-600 mt-1">
+                  Masih ada baris yang belum punya NIP terkonfirmasi — pilih pegawai di kolom "NIP Terpilih".
+                </div>
+              )}
             </div>
           )}
         </div>

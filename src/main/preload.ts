@@ -6,7 +6,9 @@ import type {
   ProcessInput,
   ProcessResult,
   SPMBatchSummary,
-  CreatePeriodeInput
+  CreatePeriodeInput,
+  ParsedPdf,
+  PdfRowOverrides
 } from '@shared/types';
 
 const api = {
@@ -26,6 +28,11 @@ const api = {
     listByPeriode: (periode: Periode): Promise<SPMBatchSummary[]> =>
       ipcRenderer.invoke('spm:listByPeriode', periode),
     delete: (batchId: number): Promise<void> => ipcRenderer.invoke('spm:delete', batchId)
+  },
+  pdf: {
+    pickAndParse: (): Promise<ParsedPdf | null> => ipcRenderer.invoke('pdf:pickAndParse'),
+    finalize: (parsedPdf: ParsedPdf, overrides: PdfRowOverrides): Promise<ParsedSPM> =>
+      ipcRenderer.invoke('pdf:finalize', parsedPdf, overrides)
   },
   process: {
     run: (input: ProcessInput): Promise<ProcessResult> => ipcRenderer.invoke('process:run', input)
