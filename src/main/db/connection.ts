@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS spm_batch (
   UNIQUE(periode, no_spm)
 );
 
+-- spm_row stores rows for ALL kategori (gaji | tunjangan | uang_makan).
+-- Columns are partitioned by spm_batch.kategori (source of truth).
+-- Legacy gaji columns (gjpokok..potpfk10) are NOT NULL — for non-gaji rows
+-- we insert 0. Non-gaji columns (bersih, pajak, kotor, potongan, pph) are
+-- nullable and only populated for matching kategori.
 CREATE TABLE IF NOT EXISTS spm_row (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   batch_id   INTEGER NOT NULL REFERENCES spm_batch(id) ON DELETE CASCADE,
@@ -57,6 +62,11 @@ CREATE TABLE IF NOT EXISTS spm_row (
   tjberas    REAL NOT NULL,
   tjpph      REAL NOT NULL,
   potpfk10   REAL NOT NULL,
+  bersih     REAL,
+  pajak      REAL,
+  kotor      REAL,
+  potongan   REAL,
+  pph        REAL,
   row_order  INTEGER NOT NULL
 );
 
@@ -80,6 +90,11 @@ export function applyMigrations(db: Database.Database): void {
   ensureColumn(db, 'spm_row', 'tjstruk', 'tjstruk REAL NOT NULL DEFAULT 0');
   ensureColumn(db, 'spm_row', 'tjfungs', 'tjfungs REAL NOT NULL DEFAULT 0');
   ensureColumn(db, 'spm_row', 'pembul',  'pembul  REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'spm_row', 'bersih',   'bersih   REAL');
+  ensureColumn(db, 'spm_row', 'pajak',    'pajak    REAL');
+  ensureColumn(db, 'spm_row', 'kotor',    'kotor    REAL');
+  ensureColumn(db, 'spm_row', 'potongan', 'potongan REAL');
+  ensureColumn(db, 'spm_row', 'pph',      'pph      REAL');
 }
 
 export function openDatabase(userDataDir: string): Database.Database {

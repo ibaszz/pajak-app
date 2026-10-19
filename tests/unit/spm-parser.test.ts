@@ -13,6 +13,7 @@ describe('parseGajiSPM', () => {
     expect(result.filePath).toBe(FIXTURE);
     expect(result.rowCount).toBeGreaterThan(0);
     expect(result.rows.length).toBe(result.rowCount);
+    if (result.kategori !== 'gaji') throw new Error('expected gaji kategori');
 
     const first = result.rows[0];
     expect(typeof first.nip).toBe('string');

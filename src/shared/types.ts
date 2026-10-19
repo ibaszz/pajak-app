@@ -2,6 +2,8 @@ export type Kategori = 'gaji' | 'tunjangan' | 'uang_makan';
 
 export type JenisASN = 'PNS' | 'PPPK';
 
+export type PnsSuffix = 'PNS' | 'PPPK' | 'MIX';
+
 export interface Pegawai {
   nip: string;
   nik: string;
@@ -34,13 +36,34 @@ export interface SPMGajiRow {
   potpfk10: number;
 }
 
-export interface ParsedSPM {
+export interface SPMTunjanganRow {
+  nip: string;
+  nama: string;
+  bersih: number;
+  pajak: number;
+}
+
+export interface SPMUangMakanRow {
+  nip: string;
+  nama: string;
+  kotor: number;
+  potongan: number;
+  bersih: number;
+  pph: number;
+}
+
+export type SPMRow = SPMGajiRow | SPMTunjanganRow | SPMUangMakanRow;
+
+interface ParsedSPMBase {
   filePath: string;
   fileName: string;
-  kategori: Kategori;
   rowCount: number;
-  rows: SPMGajiRow[];
 }
+
+export type ParsedSPM =
+  | (ParsedSPMBase & { kategori: 'gaji'; rows: SPMGajiRow[] })
+  | (ParsedSPMBase & { kategori: 'tunjangan'; rows: SPMTunjanganRow[] })
+  | (ParsedSPMBase & { kategori: 'uang_makan'; rows: SPMUangMakanRow[] });
 
 export interface ProcessInput {
   parsedSPM: ParsedSPM;
