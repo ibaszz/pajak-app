@@ -61,6 +61,26 @@ function GajiPreview({ rows }: { rows: SPMGajiRow[] }) {
             </tr>
           );
         })}
+        <tr key={"summary"} className="border-t">
+          <td className="p-1 font-bold" colSpan={2}>
+            Total
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.gjpokok, 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.tjberas, 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + (r.gjpokok + r.tjistri + r.tjanak + r.tjupns + r.tjstruk + r.tjfungs + r.pembul + r.tjberas), 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.tjpph, 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.potpfk10, 0).toLocaleString('id-ID')}
+          </td>
+        </tr>
       </tbody>
     </table>
   );
@@ -84,6 +104,17 @@ function TunjanganPreview({ rows }: { rows: SPMTunjanganRow[] }) {
             <td className="p-1 text-right">{r.pajak.toLocaleString('id-ID')}</td>
           </tr>
         ))}
+        <tr key={"summary"} className="border-t">
+          <td className="p-1 font-bold" colSpan={2}>
+            Total
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.bersih, 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.pajak, 0).toLocaleString('id-ID')}
+          </td>
+        </tr>
       </tbody>
     </table>
   );
@@ -111,6 +142,23 @@ function UangMakanPreview({ rows }: { rows: SPMUangMakanRow[] }) {
             <td className="p-1 text-right">{r.pph.toLocaleString('id-ID')}</td>
           </tr>
         ))}
+        <tr key={"summary"} className="border-t">
+          <td className="p-1 font-bold" colSpan={2}>
+            Total
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.kotor, 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.potongan, 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + (r.bersih), 0).toLocaleString('id-ID')}
+          </td>
+          <td className="p-1 text-right font-bold">
+            {rows?.reduce((sum, r) => sum + r.pph, 0).toLocaleString('id-ID')}
+          </td>
+        </tr>
       </tbody>
     </table>
   );
